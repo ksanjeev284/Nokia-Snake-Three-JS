@@ -1,4 +1,3 @@
-import React from 'react';
 import { useGameLogic } from './game/useGameLogic';
 import { Scene } from './game/Scene';
 import { Gamepad2 } from 'lucide-react';
@@ -14,10 +13,17 @@ function App() {
             <Gamepad2 className="w-6 h-6 text-gray-800" />
             <h1 className="text-2xl font-bold text-gray-800">Nokia Snake</h1>
           </div>
-          <div className="text-gray-800 font-mono">Score: {gameState.score}</div>
+          <div className="flex items-center gap-4">
+            <div className="text-gray-800 font-mono">Score: {gameState.score}</div>
+            {gameState.food.type === 'bonus' && (
+              <div className="animate-pulse text-yellow-600 font-mono">
+                Bonus Food! (+{gameState.food.points} pts)
+              </div>
+            )}
+          </div>
         </div>
         
-        <div className="aspect-square w-full border-8 border-[#9bbc7d] rounded-lg overflow-hidden">
+        <div className="aspect-square w-full border-8 border-[#9bbc7d] rounded-lg overflow-hidden shadow-lg">
           <Scene gameState={gameState} />
         </div>
 
@@ -34,7 +40,11 @@ function App() {
         )}
 
         <div className="mt-4 text-sm text-gray-700 text-center">
-          Use arrow keys to control the snake
+          {!gameState.isPlaying && !gameState.gameOver ? (
+            'Press any arrow key to start'
+          ) : (
+            'Use arrow keys to control the snake'
+          )}
         </div>
       </div>
     </div>

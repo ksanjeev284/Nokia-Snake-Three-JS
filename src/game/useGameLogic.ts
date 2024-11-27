@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Position, Direction, GameState } from './types';
+import { Position, Direction, GameState, Food, FoodType } from './types';
 import { GRID_SIZE, INITIAL_SNAKE_LENGTH, MOVE_INTERVAL } from './constants';
 
 const createInitialSnake = (): Position[] => {
@@ -12,28 +12,37 @@ const createInitialSnake = (): Position[] => {
   return snake;
 };
 
-const createRandomFood = (snake: Position[]): Position => {
-  let food: Position;
+const createRandomFood = (snake: Position[]): Food => {
+  let position: Position;
   do {
-    food = {
+    position = {
       x: Math.floor(Math.random() * GRID_SIZE),
       y: Math.floor(Math.random() * GRID_SIZE)
     };
-  } while (snake.some(segment => segment.x === food.x && segment.y === food.y));
-  return food;
+  } while (snake.some(segment => segment.x === position.x && segment.y === position.y));
+
+  // 20% chance of spawning bonus food
+  const type: FoodType = Math.random() < 0.2 ? 'bonus' : 'normal';
+  
+  return {
+    ...position,
+    type,
+    points: type === 'bonus' ? 5 : 1
+  };
 };
 
 export const useGameLogic = () => {
-  const [gameState, setGameState] = useState<GameState>({
+  const [gameState, setGameState] = useState<GameState>(() => ({
     snake: createInitialSnake(),
     food: createRandomFood(createInitialSnake()),
     direction: 'UP',
     score: 0,
-    gameOver: false
-  });
+    gameOver: false,
+    isPlaying: false
+  }));
 
   const moveSnake = useCallback(() => {
-    if (gameState.gameOver) return;
+    if (gameState.gameOver || !gameState.isPlaying) return;
 
     setGameState(prev => {
       const head = { ...prev.snake[0] };
@@ -62,7 +71,7 @@ export const useGameLogic = () => {
       // Check food collision
       if (head.x === prev.food.x && head.y === prev.food.y) {
         newFood = createRandomFood(newSnake);
-        newScore += 1;
+        newScore += prev.food.points;
       } else {
         newSnake.pop();
       }
@@ -74,9 +83,16 @@ export const useGameLogic = () => {
         score: newScore
       };
     });
-  }, [gameState.gameOver]);
+  }, [gameState.gameOver, gameState.isPlaying]);
 
   const handleKeyPress = useCallback((event: KeyboardEvent) => {
+    if (!gameState.isPlaying && !gameState.gameOver) {
+      setGameState(prev => ({
+        ...prev,
+        isPlaying: true
+      }));
+    }
+
     setGameState(prev => {
       const newDirection: Direction = (() => {
         switch (event.key) {
@@ -89,7 +105,7 @@ export const useGameLogic = () => {
       })();
       return { ...prev, direction: newDirection };
     });
-  }, []);
+  }, [gameState.isPlaying, gameState.gameOver]);
 
   useEffect(() => {
     const interval = setInterval(moveSnake, MOVE_INTERVAL);
@@ -107,7 +123,8 @@ export const useGameLogic = () => {
       food: createRandomFood(createInitialSnake()),
       direction: 'UP',
       score: 0,
-      gameOver: false
+      gameOver: false,
+      isPlaying: false
     });
   };
 

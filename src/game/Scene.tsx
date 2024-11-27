@@ -41,16 +41,35 @@ export const Scene = ({ gameState }: SceneProps) => {
     containerRef.current.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
-    // Grid
+    // Grid and boundary setup
     const gridGeometry = new THREE.PlaneGeometry(GRID_SIZE * CELL_SIZE, GRID_SIZE * CELL_SIZE);
     const gridMaterial = new THREE.MeshBasicMaterial({ 
       color: COLORS.GRID,
       side: THREE.DoubleSide 
     });
     const grid = new THREE.Mesh(gridGeometry, gridMaterial);
+    grid.position.z = -0.1;
     scene.add(grid);
 
-    // Cleanup
+    // Add boundary walls
+    const wallGeometry = new THREE.BoxGeometry(CELL_SIZE * 0.4, CELL_SIZE * 0.4, CELL_SIZE * 0.4);
+    const wallMaterial = new THREE.MeshBasicMaterial({ color: COLORS.WALL });
+
+    for (let x = -1; x <= GRID_SIZE; x++) {
+      for (let y = -1; y <= GRID_SIZE; y++) {
+        if (x === -1 || x === GRID_SIZE || y === -1 || y === GRID_SIZE) {
+          const wall = new THREE.Mesh(wallGeometry, wallMaterial);
+          wall.position.set(
+            x - GRID_SIZE / 2 + CELL_SIZE / 2,
+            -y + GRID_SIZE / 2 - CELL_SIZE / 2,
+            0
+          );
+          wall.userData.type = 'wall';
+          scene.add(wall);
+        }
+      }
+    }
+
     return () => {
       renderer.dispose();
       containerRef.current?.removeChild(renderer.domElement);
@@ -80,11 +99,49 @@ export const Scene = ({ gameState }: SceneProps) => {
       );
       mesh.userData.type = 'game';
       scene.add(mesh);
+
+      // Add eyes to head
+      if (index === 0) {
+        const eyeGeometry = new THREE.CircleGeometry(CELL_SIZE * 0.1, 16);
+        const eyeMaterial = new THREE.MeshBasicMaterial({ color: COLORS.EYE });
+        
+        const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+        const rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+        
+        const eyeOffset = CELL_SIZE * 0.2;
+        switch (gameState.direction) {
+          case 'UP':
+            leftEye.position.set(-eyeOffset, eyeOffset, 0.3);
+            rightEye.position.set(eyeOffset, eyeOffset, 0.3);
+            break;
+          case 'DOWN':
+            leftEye.position.set(-eyeOffset, -eyeOffset, 0.3);
+            rightEye.position.set(eyeOffset, -eyeOffset, 0.3);
+            break;
+          case 'LEFT':
+            leftEye.position.set(-eyeOffset, eyeOffset, 0.3);
+            rightEye.position.set(-eyeOffset, -eyeOffset, 0.3);
+            break;
+          case 'RIGHT':
+            leftEye.position.set(eyeOffset, eyeOffset, 0.3);
+            rightEye.position.set(eyeOffset, -eyeOffset, 0.3);
+            break;
+        }
+        
+        mesh.add(leftEye);
+        mesh.add(rightEye);
+      }
     });
 
     // Create food
-    const foodGeometry = new THREE.CircleGeometry(CELL_SIZE * 0.3, 16);
-    const foodMaterial = new THREE.MeshBasicMaterial({ color: COLORS.FOOD });
+    const foodGeometry = new THREE.SphereGeometry(
+      gameState.food.type === 'bonus' ? CELL_SIZE * 0.4 : CELL_SIZE * 0.3,
+      16,
+      16
+    );
+    const foodMaterial = new THREE.MeshBasicMaterial({ 
+      color: gameState.food.type === 'bonus' ? COLORS.BONUS_FOOD : COLORS.FOOD 
+    });
     const food = new THREE.Mesh(foodGeometry, foodMaterial);
     food.position.set(
       gameState.food.x - GRID_SIZE / 2 + CELL_SIZE / 2,
