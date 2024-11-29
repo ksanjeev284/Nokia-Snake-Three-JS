@@ -41,6 +41,8 @@ export const useGameLogic = () => {
     isPlaying: false
   }));
 
+  const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
+
   const moveSnake = useCallback(() => {
     if (gameState.gameOver || !gameState.isPlaying) return;
 
@@ -107,15 +109,60 @@ export const useGameLogic = () => {
     });
   }, [gameState.isPlaying, gameState.gameOver]);
 
+  const handleTouchStart = useCallback((event: TouchEvent) => {
+    const touch = event.touches[0];
+    setTouchStart({ x: touch.clientX, y: touch.clientY });
+    
+    if (!gameState.isPlaying && !gameState.gameOver) {
+      setGameState(prev => ({
+        ...prev,
+        isPlaying: true
+      }));
+    }
+  }, [gameState.isPlaying, gameState.gameOver]);
+
+  const handleTouchEnd = useCallback((event: TouchEvent) => {
+    if (!touchStart) return;
+    
+    const touch = event.changedTouches[0];
+    const deltaX = touch.clientX - touchStart.x;
+    const deltaY = touch.clientY - touchStart.y;
+    
+    // Determine if the swipe was primarily horizontal or vertical
+    if (Math.abs(deltaX) > Math.abs(deltaY)) {
+      // Horizontal swipe
+      setGameState(prev => ({
+        ...prev,
+        direction: deltaX > 0 && prev.direction !== 'LEFT' ? 'RIGHT' : 
+                  deltaX < 0 && prev.direction !== 'RIGHT' ? 'LEFT' : 
+                  prev.direction
+      }));
+    } else {
+      // Vertical swipe
+      setGameState(prev => ({
+        ...prev,
+        direction: deltaY > 0 && prev.direction !== 'UP' ? 'DOWN' : 
+                  deltaY < 0 && prev.direction !== 'DOWN' ? 'UP' : 
+                  prev.direction
+      }));
+    }
+    
+    setTouchStart(null);
+  }, [touchStart]);
+
   useEffect(() => {
     const interval = setInterval(moveSnake, MOVE_INTERVAL);
     window.addEventListener('keydown', handleKeyPress);
+    window.addEventListener('touchstart', handleTouchStart);
+    window.addEventListener('touchend', handleTouchEnd);
 
     return () => {
       clearInterval(interval);
       window.removeEventListener('keydown', handleKeyPress);
+      window.removeEventListener('touchstart', handleTouchStart);
+      window.removeEventListener('touchend', handleTouchEnd);
     };
-  }, [moveSnake, handleKeyPress]);
+  }, [moveSnake, handleKeyPress, handleTouchStart, handleTouchEnd]);
 
   const resetGame = () => {
     setGameState({

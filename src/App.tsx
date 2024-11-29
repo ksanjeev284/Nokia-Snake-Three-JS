@@ -6,18 +6,18 @@ function App() {
   const { gameState, resetGame } = useGameLogic();
 
   return (
-    <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-      <div className="bg-[#8ba67d] p-8 rounded-xl shadow-2xl w-[600px]">
-        <div className="flex items-center justify-between mb-4">
+    <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
+      <div className="bg-[#8ba67d] p-4 sm:p-8 rounded-xl shadow-2xl w-full max-w-[600px]">
+        <div className="flex flex-col sm:flex-row items-center sm:justify-between mb-4 gap-2">
           <div className="flex items-center gap-2">
             <Gamepad2 className="w-6 h-6 text-gray-800" />
-            <h1 className="text-2xl font-bold text-gray-800">Nokia Snake</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Nokia Snake</h1>
           </div>
           <div className="flex items-center gap-4">
             <div className="text-gray-800 font-mono">Score: {gameState.score}</div>
             {gameState.food.type === 'bonus' && (
-              <div className="animate-pulse text-yellow-600 font-mono">
-                Bonus Food! (+{gameState.food.points} pts)
+              <div className="animate-pulse text-yellow-600 font-mono text-sm sm:text-base">
+                Bonus! (+{gameState.food.points})
               </div>
             )}
           </div>
@@ -41,9 +41,15 @@ function App() {
 
         <div className="mt-4 text-sm text-gray-700 text-center">
           {!gameState.isPlaying && !gameState.gameOver ? (
-            'Press any arrow key to start'
+            <>
+              <span className="hidden sm:inline">Press any arrow key to start</span>
+              <span className="sm:hidden">Tap the screen to start and swipe to move</span>
+            </>
           ) : (
-            'Use arrow keys to control the snake'
+            <>
+              <span className="hidden sm:inline">Use arrow keys to control the snake</span>
+              <span className="sm:hidden">Swipe to change direction</span>
+            </>
           )}
         </div>
       </div>
