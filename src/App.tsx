@@ -23,7 +23,11 @@ function App() {
           </div>
         </div>
         
-        <div className="aspect-square w-full border-8 border-[#9bbc7d] rounded-lg overflow-hidden shadow-lg">
+        <div 
+          className="aspect-square w-full border-8 border-[#9bbc7d] rounded-lg overflow-hidden shadow-lg"
+          onTouchMove={(e) => e.preventDefault()}
+          onTouchStart={(e) => e.preventDefault()}
+        >
           <Scene gameState={gameState} />
         </div>
 
