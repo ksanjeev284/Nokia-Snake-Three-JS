@@ -1,179 +1,199 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Position, Direction, GameState, Food, FoodType } from './types';
-import { GRID_SIZE, INITIAL_SNAKE_LENGTH, MOVE_INTERVAL } from './constants';
+import { GRID_SIZE, INITIAL_SNAKE_LENGTH } from './constants';
+import { GameState, Position, Direction, Food } from './types';
+import { SnakeVariant, SnakeSkin, GameBackground } from './configurations';
 
-const createInitialSnake = (): Position[] => {
-  const snake: Position[] = [];
-  const middle = Math.floor(GRID_SIZE / 2);
-  
-  for (let i = 0; i < INITIAL_SNAKE_LENGTH; i++) {
-    snake.push({ x: middle, y: middle + i });
-  }
-  return snake;
-};
+interface GameLogicProps {
+  variant: SnakeVariant;
+  skin: SnakeSkin;
+  background: GameBackground;
+}
 
-const createRandomFood = (snake: Position[]): Food => {
-  let position: Position;
-  do {
-    position = {
-      x: Math.floor(Math.random() * GRID_SIZE),
-      y: Math.floor(Math.random() * GRID_SIZE)
-    };
-  } while (snake.some(segment => segment.x === position.x && segment.y === position.y));
-
-  // 20% chance of spawning bonus food
-  const type: FoodType = Math.random() < 0.2 ? 'bonus' : 'normal';
-  
-  return {
-    ...position,
-    type,
-    points: type === 'bonus' ? 5 : 1
-  };
-};
-
-export const useGameLogic = () => {
-  const [gameState, setGameState] = useState<GameState>(() => ({
-    snake: createInitialSnake(),
-    food: createRandomFood(createInitialSnake()),
-    direction: 'UP',
+export const useGameLogic = ({ variant }: GameLogicProps) => {
+  const [gameState, setGameState] = useState<GameState>({
+    snake: [],
+    direction: 'RIGHT',
+    food: { x: 0, y: 0, type: 'normal', points: 1 },
     score: 0,
+    isPlaying: false,
     gameOver: false,
-    isPlaying: false
-  }));
+    canPhaseWalls: variant.name === 'Ghost'
+  });
 
-  const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
+  // Initialize game
+  useEffect(() => {
+    resetGame();
+  }, []);
+
+  const resetGame = () => {
+    // Initialize snake in the middle of the grid
+    const initialSnake: Position[] = [];
+    const midY = Math.floor(GRID_SIZE / 2);
+    const startX = Math.floor(GRID_SIZE / 3);
+
+    for (let i = 0; i < INITIAL_SNAKE_LENGTH; i++) {
+      initialSnake.push({ x: startX - i, y: midY });
+    }
+
+    setGameState({
+      snake: initialSnake,
+      direction: 'RIGHT',
+      food: generateFood(initialSnake),
+      score: 0,
+      isPlaying: false,
+      gameOver: false,
+      canPhaseWalls: variant.name === 'Ghost'
+    });
+  };
+
+  const generateFood = (snake: Position[]): Food => {
+    let newFood: Position;
+    const isBonusFood = Math.random() < 0.2; // 20% chance for bonus food
+
+    do {
+      newFood = {
+        x: Math.floor(Math.random() * GRID_SIZE),
+        y: Math.floor(Math.random() * GRID_SIZE)
+      };
+    } while (snake.some(segment => segment.x === newFood.x && segment.y === newFood.y));
+
+    return {
+      ...newFood,
+      type: isBonusFood ? 'bonus' : 'normal',
+      points: isBonusFood ? 5 : 1
+    };
+  };
 
   const moveSnake = useCallback(() => {
-    if (gameState.gameOver || !gameState.isPlaying) return;
+    setGameState(prevState => {
+      if (prevState.gameOver || !prevState.isPlaying) return prevState;
 
-    setGameState(prev => {
-      const head = { ...prev.snake[0] };
-      
-      switch (prev.direction) {
-        case 'UP': head.y -= 1; break;
-        case 'DOWN': head.y += 1; break;
-        case 'LEFT': head.x -= 1; break;
-        case 'RIGHT': head.x += 1; break;
+      const newSnake = [...prevState.snake];
+      const head = { ...newSnake[0] };
+
+      // Move head
+      switch (prevState.direction) {
+        case 'UP':
+          head.y += 1;  // Inverted Y-axis
+          break;
+        case 'DOWN':
+          head.y -= 1;  // Inverted Y-axis
+          break;
+        case 'LEFT':
+          head.x -= 1;
+          break;
+        case 'RIGHT':
+          head.x += 1;
+          break;
       }
 
       // Check wall collision
       if (head.x < 0 || head.x >= GRID_SIZE || head.y < 0 || head.y >= GRID_SIZE) {
-        return { ...prev, gameOver: true };
+        if (prevState.canPhaseWalls) {
+          // Ghost snake can phase through walls once
+          head.x = (head.x + GRID_SIZE) % GRID_SIZE;
+          head.y = (head.y + GRID_SIZE) % GRID_SIZE;
+          return {
+            ...prevState,
+            snake: [head, ...newSnake.slice(0, -1)],
+            canPhaseWalls: false // Use up the wall phase ability
+          };
+        }
+        return { ...prevState, gameOver: true };
       }
 
       // Check self collision
-      if (prev.snake.some(segment => segment.x === head.x && segment.y === head.y)) {
-        return { ...prev, gameOver: true };
+      if (newSnake.some(segment => segment.x === head.x && segment.y === head.y)) {
+        return { ...prevState, gameOver: true };
       }
-
-      const newSnake = [head, ...prev.snake];
-      let newFood = prev.food;
-      let newScore = prev.score;
 
       // Check food collision
-      if (head.x === prev.food.x && head.y === prev.food.y) {
-        newFood = createRandomFood(newSnake);
-        newScore += prev.food.points;
-      } else {
-        newSnake.pop();
+      if (head.x === prevState.food.x && head.y === prevState.food.y) {
+        newSnake.unshift(head);
+        return {
+          ...prevState,
+          snake: newSnake,
+          food: generateFood(newSnake),
+          score: prevState.score + prevState.food.points
+        };
       }
 
-      return {
-        ...prev,
-        snake: newSnake,
-        food: newFood,
-        score: newScore
-      };
+      // Normal movement
+      newSnake.unshift(head);
+      newSnake.pop();
+
+      return { ...prevState, snake: newSnake };
     });
-  }, [gameState.gameOver, gameState.isPlaying]);
+  }, []);
 
-  const handleKeyPress = useCallback((event: KeyboardEvent) => {
-    if (!gameState.isPlaying && !gameState.gameOver) {
-      setGameState(prev => ({
-        ...prev,
-        isPlaying: true
-      }));
-    }
-
-    setGameState(prev => {
-      const newDirection: Direction = (() => {
-        switch (event.key) {
-          case 'ArrowUp': return prev.direction !== 'DOWN' ? 'UP' : prev.direction;
-          case 'ArrowDown': return prev.direction !== 'UP' ? 'DOWN' : prev.direction;
-          case 'ArrowLeft': return prev.direction !== 'RIGHT' ? 'LEFT' : prev.direction;
-          case 'ArrowRight': return prev.direction !== 'LEFT' ? 'RIGHT' : prev.direction;
-          default: return prev.direction;
-        }
-      })();
-      return { ...prev, direction: newDirection };
-    });
-  }, [gameState.isPlaying, gameState.gameOver]);
-
-  const handleTouchStart = useCallback((event: TouchEvent) => {
-    const touch = event.touches[0];
-    setTouchStart({ x: touch.clientX, y: touch.clientY });
-    
-    if (!gameState.isPlaying && !gameState.gameOver) {
-      setGameState(prev => ({
-        ...prev,
-        isPlaying: true
-      }));
-    }
-  }, [gameState.isPlaying, gameState.gameOver]);
-
-  const handleTouchEnd = useCallback((event: TouchEvent) => {
-    if (!touchStart) return;
-    
-    const touch = event.changedTouches[0];
-    const deltaX = touch.clientX - touchStart.x;
-    const deltaY = touch.clientY - touchStart.y;
-    
-    // Determine if the swipe was primarily horizontal or vertical
-    if (Math.abs(deltaX) > Math.abs(deltaY)) {
-      // Horizontal swipe
-      setGameState(prev => ({
-        ...prev,
-        direction: deltaX > 0 && prev.direction !== 'LEFT' ? 'RIGHT' : 
-                  deltaX < 0 && prev.direction !== 'RIGHT' ? 'LEFT' : 
-                  prev.direction
-      }));
-    } else {
-      // Vertical swipe
-      setGameState(prev => ({
-        ...prev,
-        direction: deltaY > 0 && prev.direction !== 'UP' ? 'DOWN' : 
-                  deltaY < 0 && prev.direction !== 'DOWN' ? 'UP' : 
-                  prev.direction
-      }));
-    }
-    
-    setTouchStart(null);
-  }, [touchStart]);
-
+  // Game loop
   useEffect(() => {
-    const interval = setInterval(moveSnake, MOVE_INTERVAL);
-    window.addEventListener('keydown', handleKeyPress);
-    window.addEventListener('touchstart', handleTouchStart);
-    window.addEventListener('touchend', handleTouchEnd);
+    if (!gameState.isPlaying || gameState.gameOver) return;
 
-    return () => {
-      clearInterval(interval);
-      window.removeEventListener('keydown', handleKeyPress);
-      window.removeEventListener('touchstart', handleTouchStart);
-      window.removeEventListener('touchend', handleTouchEnd);
+    const interval = setInterval(() => {
+      moveSnake();
+    }, variant.speed);
+
+    return () => clearInterval(interval);
+  }, [gameState.isPlaying, gameState.gameOver, moveSnake, variant.speed]);
+
+  // Handle keyboard input
+  useEffect(() => {
+    const handleKeyPress = (event: KeyboardEvent) => {
+      if (!gameState.isPlaying && !gameState.gameOver) {
+        setGameState(prev => ({ ...prev, isPlaying: true }));
+      }
+
+      let newDirection: Direction;
+      switch (event.key) {
+        case 'ArrowUp':
+          newDirection = 'UP';
+          break;
+        case 'ArrowDown':
+          newDirection = 'DOWN';
+          break;
+        case 'ArrowLeft':
+          newDirection = 'LEFT';
+          break;
+        case 'ArrowRight':
+          newDirection = 'RIGHT';
+          break;
+        default:
+          return;
+      }
+
+      setGameState(prevState => {
+        // Prevent 180-degree turns
+        const opposites: Record<Direction, Direction> = {
+          UP: 'DOWN',
+          DOWN: 'UP',
+          LEFT: 'RIGHT',
+          RIGHT: 'LEFT'
+        };
+        if (opposites[newDirection] === prevState.direction) {
+          return prevState;
+        }
+        return { ...prevState, direction: newDirection };
+      });
     };
-  }, [moveSnake, handleKeyPress, handleTouchStart, handleTouchEnd]);
 
-  const resetGame = () => {
-    setGameState({
-      snake: createInitialSnake(),
-      food: createRandomFood(createInitialSnake()),
-      direction: 'UP',
-      score: 0,
-      gameOver: false,
-      isPlaying: false
-    });
-  };
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [gameState.isPlaying, gameState.gameOver]);
+
+  // Rainbow snake effect
+  useEffect(() => {
+    if (variant.name === 'Rainbow' && gameState.isPlaying && !gameState.gameOver) {
+      const interval = setInterval(() => {
+        setGameState(prev => ({
+          ...prev,
+          rainbowHue: ((prev.rainbowHue || 0) + 5) % 360
+        }));
+      }, 100);
+
+      return () => clearInterval(interval);
+    }
+  }, [variant.name, gameState.isPlaying, gameState.gameOver]);
 
   return { gameState, resetGame };
 };

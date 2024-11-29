@@ -10,7 +10,7 @@ export type Food = Position & {
   points: number;
 };
 
-export type Direction = 'UP' | 'DOWN' | 'LEFT' | 'RIGHT';
+export type Direction = 'RIGHT' | 'LEFT' | 'UP' | 'DOWN';
 
 export type GameState = {
   snake: Position[];
@@ -19,4 +19,6 @@ export type GameState = {
   score: number;
   gameOver: boolean;
   isPlaying: boolean;
+  canPhaseWalls?: boolean;
+  rainbowHue?: number;
 };
